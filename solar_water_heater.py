@@ -2,22 +2,34 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 
+# Define physical constants
+SPECIFIC_HEAT_CAPACITY_WATER = 4.18  # J/(g*C)
+THERMAL_CONDUCTIVITY_WATER = 0.57864  # mW/m-K at 10°C
+
 class SolarCollector:
+    """
+    This class represents a solar collector in a solar water heating system.
+    It collects solar energy and uses it to heat water.
+    """
     def __init__(self, efficiency, area, initial_temperature):
         self.efficiency = efficiency # captures heat transfer efficiency from sunlight into water. Could be broken down more to account for materials, etc.
         self.area = area
         self.water_temperature = initial_temperature  # initial temperature
     # ...
     def collect_energy(self, sunlight_intensity, flow_rate):
-        energy_collected = self.efficiency * self.area * sunlight_intensity
+        # Decrease efficiency as temperature increases
+        # This is a simple linear model where efficiency decreases by 0.01 for each degree above 25 Celsius
+        temperature_efficiency_factor = max(0, 1 - 0.01 * (self.water_temperature - 25))
+        adjusted_efficiency = self.efficiency * temperature_efficiency_factor
+
+        energy_collected = adjusted_efficiency * self.area * sunlight_intensity
         self.flow_rate = flow_rate
-        # current_water_temp = self.water_temperature
         # Assuming the specific heat capacity of water is 4.18 J/(g*C) and the density of water is 1 g/cm^3
         if energy_collected > 0:
-            self.water_temperature += energy_collected / (self.flow_rate * 1000 * 4.18)
+            self.water_temperature += energy_collected / (self.flow_rate * 1000 * SPECIFIC_HEAT_CAPACITY_WATER)
         else:
             # Subtract a constant amount of heat from the water_temperature
-            self.water_temperature -= (0.57864  * self.area * (self.water_temperature - 4)) / (self.flow_rate * 1000 * 4.18)  # 0.578 ~= thermal conductivity of water at 10°C in mW/m-K
+            self.water_temperature -= (THERMAL_CONDUCTIVITY_WATER  * self.area * (self.water_temperature - 4)) / (self.flow_rate * 1000 * SPECIFIC_HEAT_CAPACITY_WATER)  # 0.578 ~= thermal conductivity of water at 10°C in mW/m-K
 
 
 class Pump:
@@ -51,7 +63,7 @@ def get_user_input():
     volume = float(input("Enter the volume of the storage tank (in liters): "))
     thermal_efficiency = float(input("Enter the thermal efficiency of the storage tank: "))
     initial_temperature = float(input("Enter the initial temperature of the water (in degrees Celsius): "))
-    sunlight_intensity = float(input("Enter the peak sunlight intensity (in watts per square meter): "))
+    sunlight_intensity = float(input("Enter the peak sunlight intensity (in watts per square meter, peak value is 1361 W/m^2): "))
     duration = int(input("Enter the duration of the simulation (in minutes): "))
     
     # Save the values to the input file for next time
@@ -105,13 +117,25 @@ def run_simulation():
         sunlight_intensity_values.append(new_sunlight_intensity)
 
     # Plot the temperature values against the time values
-    plt.plot(time_values, temperature_values)
-    # plt.plot(time_values, sunlight_intensity_values)
-    plt.xlabel('Time (minutes)')
-    plt.ylabel('Tank Temperature (degrees Celsius)')
-    # plt.ylabel('Sunlight Intensity (Watts per square meter)')
-    plt.title('Tank Temperature vs Time')
-    plt.show()    
+    fig, ax1 = plt.subplots()
+
+    color = 'tab:red'
+    ax1.set_xlabel('Time (minutes)')
+    ax1.set_ylabel('Tank Temperature (degrees Celsius)', color=color)
+    ax1.plot(time_values, temperature_values, color=color)
+    ax1.tick_params(axis='y', labelcolor=color)
+
+    ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
+
+    color = 'tab:blue'
+    ax2.set_ylabel('Sunlight Intensity (Watts per square meter)', color=color)  # we already handled the x-label with ax1
+    ax2.plot(time_values, sunlight_intensity_values, color=color)
+    ax2.tick_params(axis='y', labelcolor=color)
+
+    fig.tight_layout()  # otherwise the right y-label is slightly clipped
+    plt.title('Tank Temperature and Sunlight Intensity vs Time')
+    plt.show()
+    
 if __name__ == "__main__":
     run_simulation()
 
